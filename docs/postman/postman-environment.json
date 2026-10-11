@@ -1,0 +1,87 @@
+{
+  "id": "b4f74f67-b5a7-40e7-a9bf-123456789abc",
+  "name": "DisiplinGuard Local",
+  "values": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000/api",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "access_token",
+      "value": "",
+      "type": "secret",
+      "enabled": true
+    },
+    {
+      "key": "refresh_token",
+      "value": "",
+      "type": "secret",
+      "enabled": true
+    },
+    {
+      "key": "student_id",
+      "value": "1",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "prediction_id",
+      "value": "1",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "nonexistent_student_id",
+      "value": "99999999",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "forbidden_student_id",
+      "value": "2",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "signup_email",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "test_password",
+      "value": "ChangeMe123!Secure",
+      "type": "secret",
+      "enabled": true
+    },
+    {
+      "key": "student_code",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "created_user_id",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "monitoring_history_id",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "random_suffix",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    }
+  ],
+  "_postman_variable_scope": "environment",
+  "_postman_exported_at": "2026-10-10T14:05:46.799606+00:00",
+  "_postman_exported_using": "ChatGPT"
+}

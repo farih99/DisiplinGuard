@@ -1,0 +1,1031 @@
+{
+  "info": {
+    "_postman_id": "8f0e2500-c36d-4d1e-9548-123456789abc",
+    "name": "DisiplinGuard API - QA Collection",
+    "description": "Postman Collection untuk API DisiplinGuard FastAPI. Import postman-environment.json terlebih dahulu. Jalankan request secara berurutan dari folder 1. Auth. Signup membuat email unik, login menyimpan token, refresh melakukan rotasi token dan memperbarui environment. Data siswa/kelas harus tersedia dan pengguna harus memiliki penugasan kelas yang sesuai. Endpoint AI saat scaffold belum memiliki model sehingga fallback 503 adalah expected. Folder Negative Cases memuat request yang sengaja mengharapkan 401, 403, 404, 422, dan 503. Request 403 membutuhkan ID siswa nyata di luar scope pengguna.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1. Auth",
+      "description": "Signup, login, refresh token, dan profil pengguna.",
+      "item": [
+        {
+          "name": "Daftarkan akun (Signup) - 201",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/signup"
+            },
+            "description": "Signup sesuai schema saat ini: email, password, dan role guru_bk/wali_kelas. Ganti test_password di environment sebelum dipakai.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{signup_email}}\",\n  \"password\": \"{{test_password}}\",\n  \"role\": \"guru_bk\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Buat email unik untuk menghindari konflik saat collection dijalankan berulang.",
+                  "pm.environment.set('signup_email', 'qa.' + Date.now() + '@example.com');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status HTTP 201\", function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "var body = pm.response.json();",
+                  "pm.test(\"Response memuat profil pengguna\", function () {",
+                  "  pm.expect(body).to.have.property(\"id\");",
+                  "  pm.expect(body).to.have.property(\"email\");",
+                  "  pm.expect(body).to.have.property(\"role\");",
+                  "});",
+                  "if (body.id !== undefined) pm.environment.set(\"created_user_id\", String(body.id));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login pengguna (Login) - 200",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/login"
+            },
+            "description": "Menyimpan access_token dan refresh_token secara otomatis ke environment.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{signup_email}}\",\n  \"password\": \"{{test_password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status HTTP 200\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "var body = pm.response.json();",
+                  "pm.test(\"Token access dan refresh tersedia\", function () {",
+                  "  pm.expect(body.access_token).to.be.a(\"string\").and.not.empty;",
+                  "  pm.expect(body.refresh_token).to.be.a(\"string\").and.not.empty;",
+                  "  pm.expect(body.token_type).to.eql(\"bearer\");",
+                  "});",
+                  "if (body.access_token) pm.environment.set(\"access_token\", body.access_token);",
+                  "if (body.refresh_token) pm.environment.set(\"refresh_token\", body.refresh_token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Perbarui token (Refresh Token) - 200",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/refresh"
+            },
+            "description": "Refresh token dirotasi. Token refresh sebelumnya seharusnya tidak dapat digunakan kembali. Jalankan sebelum request protected berikutnya.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh_token\": \"{{refresh_token}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status HTTP 200\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "var body = pm.response.json();",
+                  "pm.test(\"Token baru tersedia setelah rotasi\", function () {",
+                  "  pm.expect(body.access_token).to.be.a(\"string\").and.not.empty;",
+                  "  pm.expect(body.refresh_token).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "if (body.access_token) pm.environment.set(\"access_token\", body.access_token);",
+                  "if (body.refresh_token) pm.environment.set(\"refresh_token\", body.refresh_token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Profil pengguna aktif (Me) - 200",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/auth/me"
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status HTTP 200\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "var body = pm.response.json();",
+                  "pm.test(\"Profil berisi email dan role tanpa password hash\", function () {",
+                  "  pm.expect(body).to.have.property(\"email\");",
+                  "  pm.expect(body).to.have.property(\"role\");",
+                  "  pm.expect(body).not.to.have.property(\"password_hash\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2. Students",
+      "description": "Daftar dan detail data siswa, absensi, serta prestasi akademik.",
+      "item": [
+        {
+          "name": "Daftar siswa (List Students) - 200",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/students?page=1&limit=20"
+            },
+            "description": "Pengguna harus memiliki assignment kelas/jurusan yang sesuai agar siswa muncul pada daftar.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status HTTP 200\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "var body = pm.response.json();",
+                  "pm.test(\"Response data berupa array\", function () { pm.expect(body.data).to.be.an(\"array\"); });",
+                  "if (body.data && body.data.length > 0) {",
+                  "  pm.environment.set(\"student_id\", String(body.data[0].id));",
+                  "  pm.environment.set(\"student_code\", String(body.data[0].student_code || \"\"));",
+                  "} else {",
+                  "  console.warn(\"Daftar siswa kosong. Isi student_id secara manual atau periksa penugasan kelas pengguna.\");",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Detail siswa (Student Detail) - 200",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/students/{{student_id}}"
+            },
+            "description": "student_id otomatis diisi dari request daftar siswa jika data tersedia.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status HTTP 200\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "var body = pm.response.json();",
+                  "pm.test(\"Data siswa memiliki identitas dasar\", function () {",
+                  "  pm.expect(body).to.have.property(\"data\");",
+                  "  pm.expect(body.data).to.have.property(\"id\");",
+                  "  pm.expect(body.data).to.have.property(\"student_code\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Absensi siswa (Student Attendance) - 200",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/students/{{student_id}}/attendance"
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status HTTP 200\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "var body = pm.response.json();",
+                  "pm.test(\"Nilai kehadiran berada di rentang 0-100\", function () {",
+                  "  pm.expect(body.attendance_percentage).to.be.at.least(0);",
+                  "  pm.expect(body.attendance_percentage).to.be.at.most(100);",
+                  "  pm.expect(body.alpha_count).to.be.at.least(0);",
+                  "  pm.expect(body.late_count).to.be.at.least(0);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Prestasi akademik siswa (Student Academic) - 200",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/students/{{student_id}}/academic"
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status HTTP 200\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "var body = pm.response.json();",
+                  "pm.test(\"Response memuat student_id dan average_score\", function () {",
+                  "  pm.expect(body).to.have.property(\"student_id\");",
+                  "  pm.expect(body).to.have.property(\"average_score\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3. Predictions",
+      "description": "Endpoint AI prediksi dan pengambilan hasil prediksi.",
+      "item": [
+        {
+          "name": "Buat prediksi kedisiplinan (Create Prediction) - 201",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/predictions"
+            },
+            "description": "Happy path ini baru akan lulus ketika model AI tersedia dan berhasil. Pada scaffold sekarang AIInferenceService memang mengembalikan 503 AI_UNAVAILABLE.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"student_id\": {{student_id}},\n  \"attendance_percentage\": 92.5,\n  \"alpha_count\": 2,\n  \"late_count\": 3,\n  \"average_score\": 84.0\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status HTTP 201\", function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "var body = pm.response.json();",
+                  "pm.test(\"Prediksi memuat kategori, skor, dan rekomendasi\", function () {",
+                  "  pm.expect(body).to.have.property(\"data\");",
+                  "  pm.expect([\"tinggi\", \"sedang\", \"rendah\"]).to.include(body.data.discipline_category);",
+                  "  pm.expect(body.data).to.have.property(\"risk_score\");",
+                  "  pm.expect(body.data.recommendation).to.be.a(\"string\");",
+                  "});",
+                  "if (body.data && body.data.id !== undefined) pm.environment.set(\"prediction_id\", String(body.data.id));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Detail hasil prediksi (Get Prediction) - 200",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/predictions/{{prediction_id}}"
+            },
+            "description": "Perlu prediction_id dari hasil prediksi sukses atau isi ID yang sudah tersimpan di database.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status HTTP 200\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "var body = pm.response.json();",
+                  "pm.test(\"Detail memiliki identitas prediksi\", function () {",
+                  "  pm.expect(body).to.have.property(\"data\");",
+                  "  pm.expect(body.data).to.have.property(\"id\");",
+                  "  pm.expect(body.data).to.have.property(\"student_id\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4. Priority & Dashboard",
+      "description": "Daftar prioritas siswa berisiko dan ringkasan dashboard.",
+      "item": [
+        {
+          "name": "Daftar prioritas siswa (Priority Students) - 200",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/priority-students?limit=50"
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status HTTP 200\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "var body = pm.response.json();",
+                  "pm.test(\"Response data berupa array\", function () { pm.expect(body.data).to.be.an(\"array\"); });",
+                  "if (body.data && body.data.length > 0) {",
+                  "  pm.environment.set(\"student_id\", String(body.data[0].student_id));",
+                  "  pm.environment.set(\"prediction_id\", String(body.data[0].prediction_id));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Ringkasan dashboard (Dashboard Summary) - 200",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/dashboard/summary"
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status HTTP 200\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "var body = pm.response.json();",
+                  "pm.test(\"Ringkasan memuat total siswa dan kategori\", function () {",
+                  "  pm.expect(body).to.have.property(\"data\");",
+                  "  pm.expect(body.data.total_students).to.be.a(\"number\");",
+                  "  pm.expect(body.data.discipline_categories).to.have.property(\"tinggi\");",
+                  "  pm.expect(body.data.discipline_categories).to.have.property(\"sedang\");",
+                  "  pm.expect(body.data.discipline_categories).to.have.property(\"rendah\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "5. Monitoring History",
+      "description": "Mencatat serta membaca riwayat pemantauan siswa.",
+      "item": [
+        {
+          "name": "Simpan riwayat pemantauan (Create Monitoring History) - 201",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/monitoring-history"
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"student_id\": {{student_id}},\n  \"follow_up\": \"Melakukan pemantauan awal dan menjadwalkan tindak lanjut.\",\n  \"notes\": \"Dibuat melalui Postman untuk pengujian integrasi.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status HTTP 201\", function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "var body = pm.response.json();",
+                  "pm.test(\"Riwayat memiliki ID dan student_id\", function () {",
+                  "  pm.expect(body).to.have.property(\"data\");",
+                  "  pm.expect(body.data).to.have.property(\"id\");",
+                  "  pm.expect(String(body.data.student_id)).to.eql(String(pm.environment.get(\"student_id\")));",
+                  "});",
+                  "if (body.data && body.data.id !== undefined) pm.environment.set(\"monitoring_history_id\", String(body.data.id));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Riwayat pemantauan siswa (Get Monitoring History) - 200",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/monitoring-history/{{student_id}}?offset=0&limit=50"
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status HTTP 200\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "var body = pm.response.json();",
+                  "pm.test(\"Response data berupa array\", function () { pm.expect(body.data).to.be.an(\"array\"); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "6. Negative Cases",
+      "description": "Uji unauthorized, forbidden, not found, validation error, dan AI unavailable.",
+      "item": [
+        {
+          "name": "401 - Daftar siswa tanpa token (Unauthorized)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/students?page=1&limit=20"
+            },
+            "description": "Hapus kredensial sepenuhnya untuk memastikan endpoint protected menolak request tanpa Bearer token.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status HTTP 401\", function () {",
+                  "  pm.response.to.have.status(401);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "401 - Profil tanpa token (Unauthorized)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/auth/me"
+            },
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status HTTP 401\", function () {",
+                  "  pm.response.to.have.status(401);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "401 - Login dengan kredensial salah (Invalid Credentials)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/login"
+            },
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"no-such-user@example.com\",\n  \"password\": \"WrongPassword123!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status HTTP 401\", function () {",
+                  "  pm.response.to.have.status(401);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "403 - Akses siswa di luar penugasan (Forbidden / Anti-BOLA)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/students/{{forbidden_student_id}}"
+            },
+            "description": "Prasyarat: forbidden_student_id harus merupakan ID siswa yang benar-benar ada, tetapi di luar kelas/jurusan yang ditugaskan kepada pengguna saat ini. Memerlukan aturan assignment aktif.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status HTTP 403\", function () {",
+                  "  pm.response.to.have.status(403);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "404 - Siswa tidak ditemukan (Not Found)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/students/{{nonexistent_student_id}}"
+            },
+            "description": "Gunakan ID positif yang tidak terdapat pada database, misalnya 99999999.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status HTTP 404\", function () {",
+                  "  pm.response.to.have.status(404);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "422 - Input prediksi tidak valid (Validation Error)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/predictions"
+            },
+            "description": "attendance_percentage=101 sengaja melanggar skema rentang 0-100; request seharusnya ditolak sebelum AI dipanggil.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"student_id\": {{student_id}},\n  \"attendance_percentage\": 101,\n  \"alpha_count\": 2,\n  \"late_count\": 3,\n  \"average_score\": 84.0\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status HTTP 422\", function () {",
+                  "  pm.response.to.have.status(422);",
+                  "});",
+                  "var body = pm.response.json();",
+                  "pm.test(\"Response menyediakan detail validasi\", function () { pm.expect(body).to.have.property(\"detail\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "503 - AI tidak tersedia (AI Unavailable / Timeout)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/predictions"
+            },
+            "description": "Dengan scaffold saat ini, model belum tersedia sehingga hasil yang diharapkan adalah 503 AI_UNAVAILABLE. Student_id tetap harus dapat diakses pengguna.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"student_id\": {{student_id}},\n  \"attendance_percentage\": 92.5,\n  \"alpha_count\": 2,\n  \"late_count\": 3,\n  \"average_score\": 84.0\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status HTTP 503\", function () {",
+                  "  pm.response.to.have.status(503);",
+                  "});",
+                  "var body = pm.response.json();",
+                  "pm.test(\"Kode fallback sesuai kontrak\", function () {",
+                  "  var code = body && body.detail && body.detail.code;",
+                  "  pm.expect([\"AI_UNAVAILABLE\", \"AI_TIMEOUT\"]).to.include(code);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "422 - Signup dengan role yang tidak diizinkan (Privilege Escalation)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/signup"
+            },
+            "description": "Memastikan role di luar guru_bk/wali_kelas ditolak oleh schema signup. Ini menguji validasi payload.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"attacker.{{random_suffix}}@example.com\",\n  \"password\": \"{{test_password}}\",\n  \"role\": \"admin\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.environment.set('random_suffix', String(Date.now()));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status HTTP 422\", function () {",
+                  "  pm.response.to.have.status(422);",
+                  "});",
+                  "var body = pm.response.json();",
+                  "pm.test(\"Role admin ditolak oleh validasi schema\", function () { pm.expect(body).to.have.property(\"detail\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "401 - Refresh token tidak valid (Invalid Refresh Token)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/refresh"
+            },
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh_token\": \"invalid-or-expired-refresh-token\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status HTTP 401\", function () {",
+                  "  pm.response.to.have.status(401);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
